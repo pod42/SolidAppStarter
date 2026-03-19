@@ -1,0 +1,450 @@
+/* =============================================================================
+   app.css — All application styles
+   Design tokens, layout, login screen, modals, toasts, spinner, app shell.
+   Generated components should add their styles here or in co-located CSS files.
+   ============================================================================= */
+
+/* ── Design tokens ─────────────────────────────────────────────────────────── */
+:root {
+  --sd-blue:        #1A73E8;
+  --sd-blue-dark:   #1557B0;
+  --sd-blue-light:  #E8F0FE;
+  --sd-green:       #34A853;
+  --sd-text:        #202124;
+  --sd-text-2:      #5F6368;
+  --sd-border:      #DADCE0;
+  --sd-bg:          #F8F9FA;
+  --sd-surface:     #FFFFFF;
+  --sd-shadow:      0 1px 3px rgba(60,64,67,.15), 0 1px 2px rgba(60,64,67,.12);
+  --sd-radius:      8px;
+  --sd-font:        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  font-family: var(--sd-font);
+  color: var(--sd-text);
+  background: var(--sd-bg);
+}
+
+/* ── Loading spinner ────────────────────────────────────────────────────────── */
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.spinner-lg {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--sd-border);
+  border-top-color: var(--sd-blue);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.spinner-sm {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* ── Common button styles ───────────────────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: var(--sd-blue);
+  color: #fff;
+  border: none;
+  border-radius: var(--sd-radius);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: var(--sd-blue-dark); }
+.btn-primary:disabled { opacity: 0.6; cursor: default; }
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background: transparent;
+  color: var(--sd-text-2);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-outline:hover { border-color: var(--sd-blue); color: var(--sd-blue); }
+
+/* ── Modal ──────────────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal-box {
+  background: var(--sd-surface);
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  outline: none;
+}
+
+.modal-sm  { max-width: 360px; }
+.modal-md  { max-width: 480px; }
+.modal-lg  { max-width: 640px; }
+.modal-xl  { max-width: 860px; }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--sd-text);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--sd-text-2);
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+.modal-close:hover { background: var(--sd-bg); }
+
+.modal-body {
+  padding: 16px 20px 20px;
+}
+
+/* ── Toast notifications ────────────────────────────────────────────────────── */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 2000;
+  max-width: 360px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #323232;
+  color: #fff;
+  font-size: 13.5px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  animation: toast-in 0.2s ease;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.toast-success { background: #1E7E34; }
+.toast-error   { background: #C62828; }
+.toast-warning { background: #E65100; }
+.toast-info    { background: #323232; }
+
+.toast-icon { flex-shrink: 0; }
+.toast-message { flex: 1; line-height: 1.4; }
+.toast-close {
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,0.7); padding: 2px; border-radius: 3px;
+  display: flex; align-items: center; flex-shrink: 0;
+}
+.toast-close:hover { color: #fff; }
+
+/* ── Login screen ───────────────────────────────────────────────────────────── */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sd-bg);
+  padding: 16px;
+}
+
+.login-card {
+  background: var(--sd-surface);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+}
+
+/* Desktop two-panel layout */
+@media (min-width: 960px) {
+  .login-card {
+    max-width: 860px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.login-hero {
+  display: none;
+  background: linear-gradient(135deg, #1A73E8 0%, #1557B0 60%, #0D3B86 100%);
+  padding: 48px 40px;
+  color: #fff;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+}
+
+@media (min-width: 960px) {
+  .login-hero { display: flex; }
+  .login-card-header { display: none; }
+}
+
+.login-hero h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.login-hero p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+.login-form-col {
+  padding: 32px 28px;
+}
+
+.login-card-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-title { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
+.login-subtitle { margin: 0; color: var(--sd-text-2); font-size: 14px; }
+
+.login-form { display: flex; flex-direction: column; gap: 12px; }
+
+.login-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sd-text);
+}
+
+.featured-provider-btn {
+  width: 100%;
+  text-align: left;
+  background: var(--sd-blue-light);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.featured-provider-btn.active { border-color: var(--sd-blue); }
+.featured-provider-btn:hover  { border-color: var(--sd-blue); }
+
+.fpb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.fpb-name {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sd-blue);
+}
+
+.fpb-badge {
+  font-size: 11px;
+  background: var(--sd-blue);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.fpb-desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sd-text-2);
+}
+
+.login-presets-label {
+  font-size: 12px;
+  color: var(--sd-text-2);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.login-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-btn {
+  padding: 5px 12px;
+  border: 1.5px solid var(--sd-border);
+  border-radius: 20px;
+  background: transparent;
+  font-size: 12.5px;
+  cursor: pointer;
+  color: var(--sd-text-2);
+  transition: all 0.12s;
+}
+.preset-btn.active,
+.preset-btn:hover { border-color: var(--sd-blue); color: var(--sd-blue); background: var(--sd-blue-light); }
+
+.login-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  font-size: 14px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.12s;
+}
+.login-input:focus { border-color: var(--sd-blue); }
+
+.login-error {
+  margin: 0;
+  padding: 10px 12px;
+  background: #FDECEA;
+  color: #C62828;
+  border-radius: var(--sd-radius);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px;
+  background: var(--sd-blue);
+  color: #fff;
+  border: none;
+  border-radius: var(--sd-radius);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-top: 4px;
+}
+.login-btn:hover:not(:disabled) { background: var(--sd-blue-dark); }
+.login-btn:disabled { opacity: 0.6; cursor: default; }
+
+.login-footer {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--sd-text-2);
+  text-align: center;
+}
+.login-footer a { color: var(--sd-blue); }
+
+/* ── App shell (placeholder layout) ────────────────────────────────────────── */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--sd-surface);
+  border-bottom: 1px solid var(--sd-border);
+  box-shadow: var(--sd-shadow);
+}
+
+.app-shell-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--sd-blue);
+}
+
+.app-shell-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-shell-username {
+  font-size: 14px;
+  color: var(--sd-text-2);
+}
+
+.app-shell-main {
+  flex: 1;
+  padding: 32px 24px;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.app-shell-placeholder {
+  text-align: center;
+  padding: 64px 32px;
+  background: var(--sd-surface);
+  border-radius: 16px;
+  border: 2px dashed var(--sd-border);
+}
+
+.app-shell-placeholder h2 { margin: 0 0 12px; font-size: 22px; }
+.app-shell-placeholder p  { margin: 8px 0; font-size: 15px; line-height: 1.6; }
+.app-shell-placeholder code {
+  background: var(--sd-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--sd-blue);
+}
