@@ -45,7 +45,7 @@ export function useAuth() {
       oidcIssuer,
       redirectUrl,
       clientName: import.meta.env.VITE_APP_NAME || 'My Solid App',
-      clientId: `${window.location.origin}/client-id.json`,
+      clientId: import.meta.env.VITE_CLIENT_ID_URL || `${window.location.origin}/client-id.json`,
     });
   }, []);
 

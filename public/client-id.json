@@ -1,13 +1,13 @@
 {
   "@context": "https://www.w3.org/ns/solid/oidc-context.jsonld",
-  "client_id": "https://YOUR-APP-DOMAIN/client-id.json",
-  "client_name": "My Solid App",
+  "client_id": "https://privatedatapod.com/client-id.json",
+  "client_name": "POI Manager",
   "redirect_uris": [
-    "https://YOUR-APP-DOMAIN/",
+    "https://privatedatapod.com/",
     "http://localhost:5173/"
   ],
-  "logo_uri": "https://YOUR-APP-DOMAIN/icons/pwa-192x192.png",
-  "client_uri": "https://YOUR-APP-DOMAIN/",
+  "logo_uri": "https://privatedatapod.com/icons/pwa-192x192.png",
+  "client_uri": "https://privatedatapod.com/",
   "scope": "openid webid offline_access",
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
