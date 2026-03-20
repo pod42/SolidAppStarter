@@ -176,7 +176,7 @@ After first deploy: point your DNS CNAME to the CloudFront domain printed in the
 
 ```bash
 # 1. Clone the template
-git clone https://github.com/YOUR-ORG/PDPAppTemplate.git my-new-app
+git clone https://github.com/YOUR-ORG/SolidAppStarter.git my-new-app
 cd my-new-app
 
 # 2. Install dependencies
@@ -184,18 +184,72 @@ npm install
 
 # 3. Set up environment
 cp .env.example .env
-# Edit .env with your app name and domain
+# Edit .env — set VITE_APP_NAME, VITE_APP_DOMAIN, VITE_SUPPORT_EMAIL
 
-# 4. Update client-id.json
-# Replace YOUR-APP-DOMAIN with your production domain
+# 4. Update public/client-id.json
+# Replace every instance of YOUR-APP-DOMAIN with your production domain
 
-# 5. Generate your application
-# Open GitHub Copilot Chat, type:
-#   /create-app build me a [type of app] that [what it does]
+# 5. (Optional) Enable mock mode for development without a Solid Pod
+# Add VITE_MOCK_MODE=true to your .env
 
 # 6. Run dev server
 npm run dev
+# You should see the "Ready to build" placeholder after logging in
+
+# 7. Scaffold your feature with AI
+# Open PROMPT.md and follow the instructions to generate your AppShell
 ```
+
+---
+
+## 12. Building Your Feature
+
+The only file you need to replace is `src/components/AppShell.jsx`.
+Everything else — auth, pod utilities, UI primitives — is pre-built and stable.
+
+**The standard init pattern** (already in AppShell.jsx):
+```
+webId available
+  → ops.fetchProfile()              → gets name, storageRoot, avatar
+  → define appRoot                  → storageRoot + 'your-app-slug/'
+  → HEAD appRoot → createFolder()   → creates folder if missing
+  → ensureOwnInboxAppendable()      → sets up inbox (required!)
+  → load your data
+```
+
+**Storing data (JSON-LD — Solid spec recommended):**
+
+Solid is built on Linked Data. Store records as `application/ld+json` with a `@context`
+so data is interpretable by other Solid apps. JSON-LD is valid JSON — `.json()` works.
+
+```js
+// Write
+const record = {
+  '@context': { '@vocab': 'https://schema.org/', 'dcterms': 'http://purl.org/dc/terms/' },
+  '@id': appRoot + item.id,        // resource URL as the RDF subject
+  '@type': 'Thing',                // e.g. 'Note', 'Event', 'Place', 'Product'
+  'name': item.name,
+  'description': item.description,
+  'dcterms:created': item.created,
+  'dcterms:modified': new Date().toISOString(),
+};
+const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/ld+json' });
+await ops.uploadFile(appRoot + item.id + '.jsonld', blob, session.fetch);
+
+// Read all
+const files = await ops.listContainer(appRoot, session.fetch);
+const loaded = await Promise.all(
+  files.filter(i => !i.isFolder && i.name.endsWith('.jsonld')).map(async f => {
+    const r = await session.fetch(f.url);
+    return r.ok ? r.json() : null;
+  })
+);
+
+// Delete
+await ops.deleteResource(appRoot + item.id + '.jsonld', session.fetch);
+```
+
+See `PROMPT.md` for the ready-to-use AI prompt to scaffold your feature.
 
 ---
 
