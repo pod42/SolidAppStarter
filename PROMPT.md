@@ -175,6 +175,41 @@ anything user-facing or potentially shared.
 - Never use getSolidDatasetWithAcl() on non-RDF files → use getResourceInfoWithAcl()
 - deleteResource() handles recursive container deletion
 
+**Hierarchical data (sub-folders):**
+When your app uses grouped/nested data (e.g. collections containing items), store
+each group as a sub-folder and write a metadata file (e.g. group.jsonld) inside it:
+```
+appRoot/
+  group-slug-123/
+    group.jsonld      ← group metadata (name, color, etc.)
+    poi-1234.jsonld   ← item records
+    poi-1234.jpg      ← related files (photos etc.)
+```
+To load groups, list the appRoot container and filter for isFolder === true, then
+fetch the metadata file from each folder.
+
+**Stable refs for callbacks in React:**
+When passing an onClose or callback prop to a component that uses it inside a
+useEffect, always store it in a ref so the effect does not re-run (and steal focus)
+on every re-render:
+```js
+const onCloseRef = useRef(onClose);
+onCloseRef.current = onClose;
+useEffect(() => {
+  // use onCloseRef.current() instead of onClose()
+}, [isOpen]); // NOT [isOpen, onClose]
+```
+
+**appRoot inside async callbacks:**
+setAppRoot(root) is async — child functions called later (e.g. loadGroups) may see
+stale state. Mirror the value into a ref immediately after computing it:
+```js
+const appRootRef = useRef(null);
+const root = p.storageRoot + 'my-app/';
+setAppRoot(root);
+appRootRef.current = root;   // use appRootRef.current in callbacks
+```
+
 Please generate a complete replacement for src/components/AppShell.jsx that
 implements my app. Include all necessary state, the init sequence, CRUD operations,
 and a clean UI using the existing design tokens and CSS classes.
@@ -193,3 +228,112 @@ Also list any new CSS rules I should add to src/app.css.
   "show a sidebar navigation"
 - Ask for sharing support: "allow users to share items with other pod users by WebID"
 - For complex apps, ask Copilot to scaffold one feature at a time and build incrementally
+
+---
+
+## App configuration checklist (before packaging)
+
+When you're ready to ship, update these files to match your app name and hosting domain.
+Apps hosted on **privatedatapod.com** are served at `<appname>.apps.privatedatapod.com`.
+
+### 1. `package.json` — app name (used in zip filename)
+```json
+{ "name": "geopod" }
+```
+
+### 2. `.env` — branding and domain
+```env
+VITE_APP_NAME=GeoPod
+VITE_APP_SHORT_NAME=GeoPod
+VITE_APP_DESCRIPTION=Points of Interest stored on your Solid Pod
+VITE_APP_DOMAIN=geopod.apps.privatedatapod.com
+VITE_SUPPORT_EMAIL=you@example.com
+```
+
+### 3. `public/client-id.json` — Solid OIDC registration
+Replace every occurrence of `YOUR-APP-DOMAIN` with your real domain:
+```json
+{
+  "client_id": "https://geopod.apps.privatedatapod.com/client-id.json",
+  "client_name": "GeoPod",
+  "redirect_uris": [
+    "https://geopod.apps.privatedatapod.com/",
+    "http://localhost:5173/"
+  ],
+  "logo_uri": "https://geopod.apps.privatedatapod.com/icons/pwa-192x192.png",
+  "client_uri": "https://geopod.apps.privatedatapod.com/"
+}
+```
+
+### 4. `capacitor.config.json` — iOS/Android (if using Capacitor)
+```json
+{
+  "appId": "com.example.geopod",
+  "appName": "GeoPod",
+  "server": { "hostname": "geopod.apps.privatedatapod.com" }
+}
+```
+
+Then run `.\deploy\package.ps1` to produce a deployable zip.
+
+---
+
+## Known dev environment issues & fixes
+
+### PWA manifest error in dev mode
+`vite-plugin-pwa` does not serve the manifest in dev by default, causing a browser
+console error. Add `devOptions` to the `VitePWA()` config in `vite.config.js`:
+```js
+VitePWA({
+  devOptions: {
+    enabled: true,
+    type: 'module',
+  },
+  // ... rest of config
+})
+```
+
+### Missing PWA icons
+If `public/icons/` is empty, browsers will log icon download errors. Generate
+placeholder icons with this Node.js script (no extra dependencies needed):
+```js
+// Run with: node scripts/generate-icons.js
+const fs = require('fs');
+const zlib = require('zlib');
+
+function makePng(size, r, g, b) {
+  const sig = Buffer.from([137,80,78,71,13,10,26,10]);
+  function chunk(type, data) {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const t = Buffer.from(type);
+    const crcBuf = Buffer.concat([t, data]);
+    let c = 0xffffffff;
+    for (const byte of crcBuf) {
+      c ^= byte;
+      for (let i=0;i<8;i++) c = (c&1) ? (0xedb88320^(c>>>1)) : (c>>>1);
+    }
+    c ^= 0xffffffff;
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(c >>> 0);
+    return Buffer.concat([len, t, data, crc]);
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size,0); ihdr.writeUInt32BE(size,4);
+  ihdr[8]=8; ihdr[9]=2;
+  const row = Buffer.alloc(1+size*3); row[0]=0;
+  for (let x=0;x<size;x++) { row[1+x*3]=r; row[2+x*3]=g; row[3+x*3]=b; }
+  const raw = Buffer.concat(Array(size).fill(row));
+  return Buffer.concat([sig, chunk('IHDR',ihdr), chunk('IDAT',zlib.deflateSync(raw)), chunk('IEND',Buffer.alloc(0))]);
+}
+
+fs.mkdirSync('public/icons', { recursive: true });
+[['pwa-64x64.png',64],['pwa-192x192.png',192],['pwa-512x512.png',512],
+ ['maskable-icon-512x512.png',512],['apple-touch-icon.png',180]].forEach(([name,size]) => {
+  fs.writeFileSync('public/icons/'+name, makePng(size, 26, 115, 232)); // #1A73E8
+});
+```
+
+### Mock mode: sub-folder visibility
+The mock `listContainer` in `mockStorage.js` originally only returned flat files.
+If your app stores data in sub-folders (groups, collections), you must update
+`listContainer` to also emit virtual folder entries for nested keys. See the
+implementation in `src/utils/mockStorage.js` for the correct pattern.
