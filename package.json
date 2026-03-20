@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "package": "powershell -ExecutionPolicy Bypass -File deploy/package.ps1",
     "icons": "node scripts/generate-icons.js",
     "cap:sync": "npm run build && npx cap sync"
   },

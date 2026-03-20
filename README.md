@@ -1,6 +1,6 @@
-# PDPAppTemplate
+# SolidAppStarter — POI Manager
 
-A production-ready scaffold for building web applications that store user data on [Solid Pods](https://solidproject.org). Clone this repo, answer a Copilot prompt, and have a fully working app in minutes.
+A production-ready React application that stores user data on [Solid Pods](https://solidproject.org). This repo ships a working **Points of Interest (POI) Manager** — users can add, edit, and delete geo-tagged locations stored privately on their own pod. It also serves as a reference template for building any Solid Pod web app.
 
 The recommended pod provider is **[privatedatapod.com](https://privatedatapod.com)**.
 
@@ -23,13 +23,12 @@ This template gives developers a pre-wired React app that authenticates with any
 | Node.js | 20+ | [nodejs.org](https://nodejs.org) |
 | npm | 10+ | Included with Node |
 | Git | any | |
-| GitHub Copilot | latest | Required for app generation |
 
 ### 1 — Clone and install
 
 ```bash
-git clone https://github.com/YOUR-ORG/PDPAppTemplate.git my-new-app
-cd my-new-app
+git clone https://github.com/pod42/SolidAppStarter.git my-poi-app
+cd my-poi-app
 npm install
 ```
 
@@ -42,10 +41,10 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-VITE_APP_NAME=My Recipe App
-VITE_APP_SHORT_NAME=Recipes
-VITE_APP_DESCRIPTION=Store and manage recipes on your Solid Pod
-VITE_APP_DOMAIN=recipes.example.com
+VITE_APP_NAME=POI Manager
+VITE_APP_SHORT_NAME=POI
+VITE_APP_DESCRIPTION=Store and manage points of interest on your Solid Pod
+VITE_APP_DOMAIN=your-app-domain.com
 VITE_THEME_COLOR=#1A73E8
 VITE_BG_COLOR=#F8F9FA
 VITE_SUPPORT_EMAIL=support@example.com
@@ -57,40 +56,23 @@ Edit `public/client-id.json` — replace every occurrence of `YOUR-APP-DOMAIN` w
 
 ```json
 {
-  "client_id": "https://recipes.example.com/client-id.json",
-  "client_name": "My Recipe App",
+  "client_id": "https://your-app-domain.com/client-id.json",
+  "client_name": "POI Manager",
   "redirect_uris": [
-    "https://recipes.example.com/",
+    "https://your-app-domain.com/",
     "http://localhost:5173/"
   ],
-  "client_uri": "https://recipes.example.com/"
+  "client_uri": "https://your-app-domain.com/"
 }
 ```
 
 > **Why this file matters:** Solid identity providers validate the `client_id` URI during login. The file must be publicly reachable at that URL once deployed. For local dev, `http://localhost:5173/` is already included.
 
-### 4 — Generate your application with Copilot
-
-Start the dev server:
+### 4 — Run locally
 
 ```bash
 npm run dev
 ```
-
-Open **GitHub Copilot Chat** in VS Code, then type the `/create-app` prompt followed by a description:
-
-```
-/create-app build me a recipe manager that stores recipes on my pod, 
-with a list view, a detail view, and the ability to add/edit/delete recipes
-```
-
-Copilot will:
-1. Plan the data model and component structure
-2. Replace `src/components/AppShell.jsx` with your full application
-3. Add all component styles to `src/app.css`
-4. Update `.env.example` with appropriate app metadata
-
-### 5 — Sign in and test
 
 Open `http://localhost:5173` in a browser. Sign in with a Solid Pod account (create a free one at [privatedatapod.com](https://privatedatapod.com) if you don't have one). Your app will initialize its data folder on your pod automatically on first login.
 
@@ -99,41 +81,40 @@ Open `http://localhost:5173` in a browser. Sign in with a Solid Pod account (cre
 ## Project Structure
 
 ```
-PDPAppTemplate/
-├── .env.example                    ← copy to .env and fill in
+SolidAppStarter/
+├── .env.example                    <- copy to .env and fill in
 ├── .github/
-│   ├── copilot-instructions.md     ← always-loaded Copilot context (Solid API, CSS tokens)
-│   └── prompts/
-│       └── create-app.prompt.md   ← /create-app slash command
-├── .vscode/
-│   └── extensions.json             ← recommends GitHub Copilot
-├── CONTEXT.md                      ← detailed reference for this template
+│   └── copilot-instructions.md     <- always-loaded Copilot context
 ├── deploy/
-│   ├── deploy.ps1                  ← AWS S3 + CloudFront deploy script
-│   └── state.json                  ← persisted distribution ID (gitignored)
+│   ├── package.ps1                 <- builds and zips app for PrivateDataPod.com upload
+│   └── deploy.ps1                  <- direct AWS S3 + CloudFront deploy (optional)
 ├── public/
-│   ├── client-id.json              ← Solid OIDC client registration
-│   └── icons/                      ← PWA icons (generate with npm run icons)
+│   ├── client-id.json              <- Solid OIDC client registration
+│   └── icons/                      <- PWA icons (generate with npm run icons)
 ├── src/
-│   ├── App.jsx                     ← auth router: loading → login → app
-│   ├── app.css                     ← ALL styles (tokens, login, modals, toasts)
-│   ├── index.css                   ← minimal box-sizing reset only
-│   ├── main.jsx                    ← entry point, installs error logging
+│   ├── App.jsx                     <- auth router: loading -> login -> app
+│   ├── app.css                     <- ALL styles (tokens, login, modals, toasts)
+│   ├── index.css                   <- minimal box-sizing reset only
+│   ├── main.jsx                    <- entry point, installs error logging
 │   ├── components/
-│   │   ├── AppShell.jsx            ← ← ← REPLACE THIS with your application
-│   │   ├── LoginScreen.jsx         ← OIDC login UI
-│   │   ├── Modal.jsx               ← generic accessible modal
-│   │   ├── SupportModal.jsx        ← support email + diagnostics dialog
-│   │   └── Toast.jsx               ← toast notification UI
+│   │   ├── AppShell.jsx            <- main app shell (POI list + map + toolbar)
+│   │   ├── AddEditPOIModal.jsx     <- add/edit POI form modal
+│   │   ├── ListView.jsx            <- POI list view component
+│   │   ├── MapView.jsx             <- Leaflet map view component
+│   │   ├── LoginScreen.jsx         <- OIDC login UI
+│   │   ├── Modal.jsx               <- generic accessible modal
+│   │   ├── SupportModal.jsx        <- support email + diagnostics dialog
+│   │   └── Toast.jsx               <- toast notification UI
 │   ├── hooks/
-│   │   ├── useAuth.js              ← OIDC session state (do not modify)
-│   │   └── useToast.js             ← toast state hook (do not modify)
+│   │   ├── useAuth.js              <- OIDC session state (do not modify)
+│   │   └── useToast.js             <- toast state hook (do not modify)
 │   ├── lib/
-│   │   └── errorLog.js             ← ring-buffer error logger (do not modify)
+│   │   └── errorLog.js             <- ring-buffer error logger (do not modify)
 │   └── utils/
-│       ├── solid.js                ← all Solid protocol operations (do not modify)
-│       └── fileUtils.js            ← file type helpers, URL builders (do not modify)
-├── capacitor.config.json           ← iOS/Android config (optional)
+│       ├── solid.js                <- all Solid protocol operations (do not modify)
+│       ├── fileUtils.js            <- file type helpers, URL builders (do not modify)
+│       └── mockStorage.js          <- in-memory mock for offline/dev testing
+├── capacitor.config.json           <- iOS/Android config (optional)
 ├── eslint.config.js
 ├── index.html
 ├── package.json
@@ -144,8 +125,11 @@ PDPAppTemplate/
 
 | File | When |
 |---|---|
-| `src/components/AppShell.jsx` | Generated by `/create-app` — your app lives here |
-| `src/app.css` | Add styles for your generated components |
+| `src/components/AppShell.jsx` | Your app's main authenticated shell |
+| `src/components/AddEditPOIModal.jsx` | POI add/edit form |
+| `src/components/ListView.jsx` | POI list view |
+| `src/components/MapView.jsx` | Leaflet map view |
+| `src/app.css` | Styles for your components |
 | `.env` / `.env.example` | App name, domain, support email |
 | `public/client-id.json` | Your production domain |
 | `capacitor.config.json` | iOS/Android app ID and hostname |
@@ -350,9 +334,26 @@ All styles live in `src/app.css`. Use the design tokens for consistency:
 
 ## Deployment
 
-The deploy script creates an AWS S3 bucket and CloudFront distribution. You need the AWS CLI installed and configured (`aws configure`).
+### Option A — Deploy via PrivateDataPod.com (recommended)
 
-### First deploy
+Build and package the app into a zip that you upload to PrivateDataPod.com. No AWS account required — hosting infrastructure is managed for you.
+
+```powershell
+npm run package
+```
+
+This will:
+1. Verify Node.js is available
+2. Run `npm run build` to produce the `dist/` folder
+3. Zip the built files into `<appname>-<version>-<timestamp>.zip` in the project root
+
+Upload the resulting zip to **[privatedatapod.com](https://privatedatapod.com)** to deploy.
+
+### Option B — Deploy directly to AWS S3 + CloudFront
+
+If you prefer to manage your own AWS infrastructure, use the deploy script. Requires the AWS CLI installed and configured (`aws configure`).
+
+#### First deploy
 
 ```powershell
 .\deploy\deploy.ps1 -Domain "myapp.example.com"
@@ -368,24 +369,20 @@ This will:
 
 After the first deploy, point your DNS CNAME:
 ```
-myapp.example.com  →  d3abc123.cloudfront.net
+myapp.example.com  ->  d3abc123.cloudfront.net
 ```
 
-### Subsequent deploys
+#### Subsequent deploys
 
 ```powershell
 .\deploy\deploy.ps1 -Action update -Domain "myapp.example.com"
 ```
 
-### Cache bust only
+#### Cache bust only
 
 ```powershell
 .\deploy\deploy.ps1 -Action invalidate
 ```
-
-### Custom domain with HTTPS
-
-After pointing DNS, request a certificate in AWS Certificate Manager (**us-east-1 region only**), then update your CloudFront distribution to use the custom domain and certificate.
 
 ### Environment variables at build time
 
@@ -437,7 +434,7 @@ These are handled by `solid.js` but worth knowing if you write custom Solid code
 ## FAQ
 
 **Can I use any Solid pod provider?**  
-Yes. The login screen lists `solidcommunity.net`, `inrupt.net`, `solidweb.org`, and `privatedatapod.com`. Users can also type any provider URL. The featured "Recommended" provider is `privatedatapod.com` — edit `LoginScreen.jsx` to change it.
+Yes. The login screen lets users enter any provider URL. The featured "Recommended" provider is `privatedatapod.com` — edit `LoginScreen.jsx` to change it.
 
 **Can I store data as RDF instead of JSON?**  
 Yes. Use `getSolidDataset`, `getThing`, `getUrl`, etc. from `@inrupt/solid-client`. See the [Inrupt documentation](https://docs.inrupt.com/developer-tools/javascript/client-libraries/tutorial/read-write-data/).
@@ -455,7 +452,7 @@ Create a component in `src/components/`, import it into `AppShell.jsx`, and add 
 
 ## Contributing
 
-This template is maintained at **privatedatapod.com**. To report issues or suggest improvements, open an issue or PR on the GitHub repository.
+This project is maintained at [github.com/pod42/SolidAppStarter](https://github.com/pod42/SolidAppStarter). To report issues or suggest improvements, open an issue or PR on the GitHub repository.
 
 ---
 
