@@ -18,8 +18,6 @@ cp .env.example .env
 npm run dev
 ```
 
-Sign in at `http://localhost:5173` with a free [privatedatapod.com](https://privatedatapod.com) account. You'll see the "Ready to build" placeholder — your pod is connected.
-
 **To build your app**, open `PROMPT.md` and follow the instructions. Copy the prompt into GitHub Copilot Chat, describe what you want to build, and Copilot generates a complete working `AppShell.jsx`.
 
 ---
@@ -70,16 +68,11 @@ Add `VITE_MOCK_MODE=true` to `.env` to develop without a Solid Pod. Data is stor
 
 ## Deployment
 
-**PrivateDataPod.com (recommended — no AWS needed):**
+**PrivateDataPod.com:**
 ```powershell
 npm run package   # builds and zips — upload the zip at privatedatapod.com
 ```
 
-**AWS S3 + CloudFront:**
-```powershell
-.\deploy\deploy.ps1 -Domain "my-app.example.com"          # first deploy
-.\deploy\deploy.ps1 -Action update -Domain "my-app.example.com"  # updates
-```
 
 ---
 

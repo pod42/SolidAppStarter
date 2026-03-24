@@ -9,7 +9,6 @@ import {
   getInteger,
   overwriteFile,
   deleteFile,
-  createContainerAt,
   getFile,
   getResourceInfoWithAcl,
   hasResourceAcl,
@@ -17,7 +16,6 @@ import {
   hasAccessibleAcl,
   createAclFromFallbackAcl,
   getResourceAcl,
-  getFallbackAcl,
   setPublicResourceAccess,
   setAgentResourceAccess,
   saveAclFor,
@@ -44,6 +42,32 @@ function deriveStorageRoot(webId) {
   return new URL('/', webId).href;
 }
 
+// Walk the URI path hierarchy to discover storage root per Solid Protocol §4.1.
+// Checks for a Link header with rel="type" targeting pim:Storage on each candidate.
+async function discoverStorageRoot(webId, fetchFn) {
+  try {
+    const u = new URL(webId);
+    const segments = u.pathname.replace(/#.*$/, '').split('/').filter(Boolean);
+    // Check candidates from the first path segment down to the origin root
+    const maxDepth = Math.min(segments.length, 3);
+    for (let i = maxDepth; i >= 0; i--) {
+      const candidatePath = i > 0 ? '/' + segments.slice(0, i).join('/') + '/' : '/';
+      const candidateUrl = `${u.origin}${candidatePath}`;
+      try {
+        const resp = await fetchFn(candidateUrl, { method: 'HEAD' });
+        if (resp.ok) {
+          const linkHeader = resp.headers?.get('Link') || '';
+          if (linkHeader.includes('http://www.w3.org/ns/pim/space#Storage')) {
+            return candidateUrl;
+          }
+        }
+      } catch { /* continue walking */ }
+    }
+  } catch { /* ignore */ }
+  // Last resort: path-based heuristic
+  return deriveStorageRoot(webId);
+}
+
 // ─── Profile ────────────────────────────────────────────────────────────────
 
 export async function fetchProfile(webId, fetchFn) {
@@ -53,7 +77,7 @@ export async function fetchProfile(webId, fetchFn) {
 
   const storageRoot =
     getUrl(profile, PIM_STORAGE) ||
-    deriveStorageRoot(webId);
+    await discoverStorageRoot(webId, fetchFn);
 
   const name =
     getStringNoLocale(profile, FOAF.name) ||
@@ -138,6 +162,13 @@ async function createContainerViaPost(containerUrl, fetchFn) {
   if (!resp.ok && resp.status !== 409) {
     throw new Error(`Failed to create container via POST: ${resp.status}`);
   }
+  // Return the actual URI assigned by the server (Solid Protocol §5.3).
+  // The server MAY assign a different URI than the Slug hint.
+  const location = resp.headers?.get('Location');
+  if (location && resp.status !== 409) {
+    return new URL(location, parentUrl).href.replace(/\/?$/, '/');
+  }
+  return withSlash;
 }
 
 export async function createFolder(containerUrl, fetchFn) {
@@ -235,14 +266,24 @@ const LDP_INBOX = 'http://www.w3.org/ns/ldp#inbox';
 const AS_NS    = 'https://www.w3.org/ns/activitystreams#';
 
 async function getInboxUrl(webId, fetchFn) {
-  // Try to read ldp:inbox from the profile first
+  // 1. Check Link header via HEAD (LDN spec primary discovery method)
+  try {
+    const headResp = await fetchFn(webId, { method: 'HEAD' });
+    if (headResp.ok) {
+      const linkHeader = headResp.headers?.get('Link') || '';
+      // Handle rel="inbox" or rel="http://www.w3.org/ns/ldp#inbox"
+      const m = linkHeader.match(/<([^>]+)>[^,]*;\s*rel="(?:inbox|http:\/\/www\.w3\.org\/ns\/ldp#inbox)"/i);
+      if (m) return new URL(m[1], webId).href;
+    }
+  } catch { /* fall through to RDF body */ }
+  // 2. Read ldp:inbox from the RDF profile body
   try {
     const ds = await getSolidDataset(webId, { fetch: fetchFn });
     const profile = getThing(ds, webId);
     const inboxUrl = profile ? getUrl(profile, LDP_INBOX) : null;
     if (inboxUrl) return inboxUrl;
-  } catch { /* fall through to derived */ }
-  // Fallback: derive inbox from WebID by convention (origin/username/inbox/)
+  } catch { /* fall through to heuristic */ }
+  // 3. Last-resort path heuristic
   try {
     const u = new URL(webId);
     const seg = u.pathname.replace(/#.*$/, '').split('/').filter(Boolean)[0];
@@ -322,11 +363,21 @@ export async function ensureOwnInboxAppendable(webId, fetchFn) {
   }
 }
 
+// Escape a plain string for safe embedding in a Turtle string literal.
+export function escapeTurtleString(str) {
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+}
+
 export async function sendShareNotification(recipientWebId, resourceUrl, resourceName, senderWebId, fetchFn) {
   const inboxUrl = await getInboxUrl(recipientWebId, fetchFn);
   if (!inboxUrl) throw new Error("Could not find recipient's inbox");
 
-  const safeName = resourceName.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const safeName = escapeTurtleString(resourceName);
   const body = [
     '@prefix as: <https://www.w3.org/ns/activitystreams#> .',
     '<> a as:Offer ;',
@@ -384,10 +435,11 @@ export async function getSharedWithMe(webId, fetchFn) {
       const resp = await fetchFn(item.url, { method: 'HEAD' });
       if (resp.ok) {
         results.push(item);
-      } else {
-        // Resource gone (404) or access revoked (403) — delete the stale notification
+      } else if (resp.status === 404) {
+        // Resource is gone — remove the stale notification
         try { await fetchFn(item.notifUrl, { method: 'DELETE' }); } catch { /* best-effort */ }
       }
+      // 403 means our access was revoked — resource still exists, keep the notification
     } catch {
       // Network/CORS error — exclude but leave notification in place (may be transient)
     }

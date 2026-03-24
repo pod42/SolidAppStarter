@@ -34,16 +34,21 @@ export default function AppShell({ session, webId, onLogout }) {
 
         // 2. Define this app's data root on the pod
         //    Change 'my-app' to a unique slug for your application
-        const root = p.storageRoot + 'my-app/';
-        setAppRoot(root);
+        const root = new URL('my-app/', p.storageRoot).href;
+        let confirmedRoot = root;
 
         // 3. Create the app folder if it doesn't exist yet
         try {
           const r = await session.fetch(root, { method: 'HEAD' });
-          if (r.status === 404) await ops.createFolder(root, session.fetch);
+          if (r.status === 404) {
+            const created = await ops.createFolder(root, session.fetch);
+            if (created) confirmedRoot = created;
+          }
         } catch {
-          await ops.createFolder(root, session.fetch);
+          const created = await ops.createFolder(root, session.fetch);
+          if (created) confirmedRoot = created;
         }
+        setAppRoot(confirmedRoot);
 
         // 4. Set up inbox (required before any sharing / notification features)
         await ops.ensureOwnInboxAppendable(webId, session.fetch);

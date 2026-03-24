@@ -51,7 +51,7 @@ export function useAuth() {
 
   const handleLogout = useCallback(async () => {
     try {
-      await logout({ logoutType: 'app' });
+      await logout({ logoutType: 'idp' });
     } catch {
       /* ignore */
     }

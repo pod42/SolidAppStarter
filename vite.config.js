@@ -41,8 +41,8 @@ export default defineConfig(({ mode }) => {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           runtimeCaching: [
             {
-              // Solid Pod requests — network first, fall back to cache
-              urlPattern: ({ url }) => url.hostname.endsWith('privatedatapod.com'),
+              // Solid Pod requests (any HTTPS provider) — network first, fall back to cache
+              urlPattern: ({ url }) => url.protocol === 'https:',
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'solid-pod-cache',
