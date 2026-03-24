@@ -1,5 +1,6 @@
 import {
   getSolidDataset,
+  createSolidDataset,
   getContainedResourceUrlAll,
   getThing,
   getThingAll,
@@ -19,8 +20,12 @@ import {
   setPublicResourceAccess,
   setAgentResourceAccess,
   saveAclFor,
+  setThing,
+  saveSolidDatasetAt,
+  createThing,
+  buildThing,
 } from '@inrupt/solid-client';
-import { FOAF, VCARD } from '@inrupt/vocab-common-rdf';
+import { FOAF, VCARD, RDF } from '@inrupt/vocab-common-rdf';
 
 const PIM_STORAGE    = 'http://www.w3.org/ns/pim/space#storage';
 const DCTERMS_MODIFIED = 'http://purl.org/dc/terms/modified';
@@ -66,6 +71,69 @@ async function discoverStorageRoot(webId, fetchFn) {
   } catch { /* ignore */ }
   // Last resort: path-based heuristic
   return deriveStorageRoot(webId);
+}
+
+// ─── Type Index (Schema Discovery) ──────────────────────────────────────────
+
+const SOLID_PUBLIC_TYPE_INDEX  = 'http://www.w3.org/ns/solid/terms#publicTypeIndex';
+const SOLID_FOR_CLASS          = 'http://www.w3.org/ns/solid/terms#forClass';
+const SOLID_INSTANCE_CONTAINER = 'http://www.w3.org/ns/solid/terms#instanceContainer';
+const SOLID_INSTANCE           = 'http://www.w3.org/ns/solid/terms#instance';
+const TYPE_REGISTRATION        = 'http://www.w3.org/ns/solid/terms#TypeRegistration';
+
+// Rule 0 — Read solid:publicTypeIndex from the WebID profile; conventional
+// fallback only if the profile does not advertise the URL explicitly.
+export async function resolveTypeIndexUrl(webId, podRoot, fetchFn) {
+  try {
+    const ds      = await getSolidDataset(webId, { fetch: fetchFn });
+    const profile = getThing(ds, webId);
+    const fromProfile = profile ? getUrl(profile, SOLID_PUBLIC_TYPE_INDEX) : null;
+    if (fromProfile) return fromProfile;
+  } catch { /* fall through */ }
+  return `${podRoot}settings/publicTypeIndex.ttl`;
+}
+
+// Rule 1 — Look up a container (or singleton) for a given RDF type in the
+// type index. Returns the URL string or null if no registration exists yet.
+export async function findContainerForType(webId, podRoot, typeUri, fetchFn) {
+  const typeIndexUrl = await resolveTypeIndexUrl(webId, podRoot, fetchFn);
+  try {
+    const ds = await getSolidDataset(typeIndexUrl, { fetch: fetchFn });
+    for (const reg of getThingAll(ds)) {
+      if (getUrl(reg, SOLID_FOR_CLASS) === typeUri) {
+        return (
+          getUrl(reg, SOLID_INSTANCE_CONTAINER) ||
+          getUrl(reg, SOLID_INSTANCE) ||
+          null
+        );
+      }
+    }
+  } catch { /* type index absent or inaccessible */ }
+  return null;
+}
+
+// Rule 2 — Register a container in the type index after creating it. Creates
+// the type index document from scratch if none exists on the pod yet.
+export async function registerTypeIndex(webId, podRoot, typeUri, containerUrl, fetchFn) {
+  const typeIndexUrl = await resolveTypeIndexUrl(webId, podRoot, fetchFn);
+  try {
+    let ds;
+    try {
+      ds = await getSolidDataset(typeIndexUrl, { fetch: fetchFn });
+    } catch {
+      ds = createSolidDataset();
+    }
+    const reg = buildThing(createThing())
+      .addUrl(RDF.type, TYPE_REGISTRATION)
+      .addUrl(SOLID_FOR_CLASS, typeUri)
+      .addUrl(SOLID_INSTANCE_CONTAINER, containerUrl)
+      .build();
+    ds = setThing(ds, reg);
+    await saveSolidDatasetAt(typeIndexUrl, ds, { fetch: fetchFn });
+  } catch (e) {
+    console.warn('Could not write type index:', e);
+    // Non-fatal — app still works, just not discoverable by other apps
+  }
 }
 
 // ─── Profile ────────────────────────────────────────────────────────────────

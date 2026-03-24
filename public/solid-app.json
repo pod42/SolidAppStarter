@@ -1,0 +1,11 @@
+{
+  "@context": "https://store.stucco.software/schema",
+  "@type": ["Application", "Solid"],
+  "title": "My Solid App",
+  "subtitle": "One-line tagline.",
+  "description": "Full description for the app directory.",
+  "logo": "/icons/pwa-192x192.png",
+  "developer": "https://privatedatapod.com",
+  "category": ["Productivity"],
+  "solidTypes": []
+}

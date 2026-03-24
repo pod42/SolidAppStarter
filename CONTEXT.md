@@ -103,6 +103,21 @@ webId available
 - `sendShareNotification(recipientWebId, resourceUrl, resourceName, senderWebId, fetch)`
 - `getSharedWithMe(webId, fetch)` → `[{ url, name, sharedBy, notifUrl }]`
 
+### Type Index (Schema Discovery)
+- `resolveTypeIndexUrl(webId, podRoot, fetch)` → string — reads `solid:publicTypeIndex` from the WebID profile; conventional fallback only
+- `findContainerForType(webId, podRoot, typeUri, fetch)` → URL string | null — check before creating any typed container
+- `registerTypeIndex(webId, podRoot, typeUri, containerUrl, fetch)` — write back after creating a container; non-fatal if pod denies
+
+**Pattern for every new typed container:**
+```js
+const existing = await findContainerForType(webId, storageRoot, TYPE_URI, session.fetch);
+const containerUrl = existing ?? `${storageRoot}my-folder/`;
+if (!existing) {
+  await createFolder(containerUrl, session.fetch);
+  await registerTypeIndex(webId, storageRoot, TYPE_URI, containerUrl, session.fetch);
+}
+```
+
 ---
 
 ## 7. Known CSS Server Quirks

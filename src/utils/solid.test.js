@@ -1,5 +1,34 @@
-import { describe, it, expect, vi } from 'vitest';
-import { escapeTurtleString } from './solid.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { escapeTurtleString, resolveTypeIndexUrl, findContainerForType, registerTypeIndex } from './solid.js';
+import * as solidClient from '@inrupt/solid-client';
+
+vi.mock('@inrupt/solid-client', () => ({
+  getSolidDataset:            vi.fn(),
+  createSolidDataset:         vi.fn(),
+  getThing:                   vi.fn(),
+  getThingAll:                vi.fn(),
+  getUrl:                     vi.fn(),
+  getStringNoLocale:          vi.fn(),
+  getDatetime:                vi.fn(),
+  getInteger:                 vi.fn(),
+  overwriteFile:              vi.fn(),
+  deleteFile:                 vi.fn(),
+  getFile:                    vi.fn(),
+  getContainedResourceUrlAll: vi.fn(),
+  getResourceInfoWithAcl:     vi.fn(),
+  hasResourceAcl:             vi.fn(),
+  hasFallbackAcl:             vi.fn(),
+  hasAccessibleAcl:           vi.fn(),
+  createAclFromFallbackAcl:   vi.fn(),
+  getResourceAcl:             vi.fn(),
+  setPublicResourceAccess:    vi.fn(),
+  setAgentResourceAccess:     vi.fn(),
+  saveAclFor:                 vi.fn(),
+  setThing:                   vi.fn(),
+  saveSolidDatasetAt:         vi.fn(),
+  createThing:                vi.fn(),
+  buildThing:                 vi.fn(),
+}));
 
 // ─── escapeTurtleString ──────────────────────────────────────────────────────
 
@@ -143,5 +172,164 @@ describe('stale notification cleanup', () => {
     }
 
     expect(deleteFn).toHaveBeenCalledWith(item.notifUrl, { method: 'DELETE' });
+  });
+});
+
+// ─── resolveTypeIndexUrl ─────────────────────────────────────────────────────
+
+describe('resolveTypeIndexUrl', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns solid:publicTypeIndex from profile when present', async () => {
+    vi.mocked(solidClient.getSolidDataset).mockResolvedValue({});
+    vi.mocked(solidClient.getThing).mockReturnValue({});
+    vi.mocked(solidClient.getUrl).mockReturnValue('https://example.com/alice/settings/publicTypeIndex.ttl');
+
+    const result = await resolveTypeIndexUrl(
+      'https://example.com/alice/profile/card#me',
+      'https://example.com/alice/',
+      vi.fn(),
+    );
+    expect(result).toBe('https://example.com/alice/settings/publicTypeIndex.ttl');
+  });
+
+  it('falls back to conventional path when profile has no publicTypeIndex', async () => {
+    vi.mocked(solidClient.getSolidDataset).mockResolvedValue({});
+    vi.mocked(solidClient.getThing).mockReturnValue({});
+    vi.mocked(solidClient.getUrl).mockReturnValue(null);
+
+    const result = await resolveTypeIndexUrl(
+      'https://example.com/alice/profile/card#me',
+      'https://example.com/alice/',
+      vi.fn(),
+    );
+    expect(result).toBe('https://example.com/alice/settings/publicTypeIndex.ttl');
+  });
+
+  it('falls back to conventional path when getSolidDataset throws', async () => {
+    vi.mocked(solidClient.getSolidDataset).mockRejectedValue(new Error('Network error'));
+
+    const result = await resolveTypeIndexUrl(
+      'https://example.com/alice/profile/card#me',
+      'https://example.com/alice/',
+      vi.fn(),
+    );
+    expect(result).toBe('https://example.com/alice/settings/publicTypeIndex.ttl');
+  });
+});
+
+// ─── findContainerForType ────────────────────────────────────────────────────
+
+describe('findContainerForType', () => {
+  const WEB_ID   = 'https://example.com/alice/profile/card#me';
+  const POD_ROOT = 'https://example.com/alice/';
+  const TYPE_URI = 'https://schema.org/NoteDigitalDocument';
+  const CONTAINER_URL = 'https://example.com/alice/notes/';
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns instanceContainer URL when type registration exists', async () => {
+    vi.mocked(solidClient.getSolidDataset)
+      .mockResolvedValueOnce({}) // profile (for resolveTypeIndexUrl)
+      .mockResolvedValueOnce({}); // type index
+    vi.mocked(solidClient.getThing).mockReturnValue({});
+    vi.mocked(solidClient.getUrl)
+      .mockReturnValueOnce('https://example.com/alice/settings/publicTypeIndex.ttl') // publicTypeIndex
+      .mockReturnValueOnce(TYPE_URI)     // forClass
+      .mockReturnValueOnce(CONTAINER_URL); // instanceContainer
+    vi.mocked(solidClient.getThingAll).mockReturnValue([{}]);
+
+    const result = await findContainerForType(WEB_ID, POD_ROOT, TYPE_URI, vi.fn());
+    expect(result).toBe(CONTAINER_URL);
+  });
+
+  it('returns null when no registration matches the type', async () => {
+    vi.mocked(solidClient.getSolidDataset)
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({});
+    vi.mocked(solidClient.getThing).mockReturnValue({});
+    vi.mocked(solidClient.getUrl)
+      .mockReturnValueOnce('https://example.com/alice/settings/publicTypeIndex.ttl')
+      .mockReturnValueOnce('https://schema.org/SomethingElse'); // forClass does not match
+    vi.mocked(solidClient.getThingAll).mockReturnValue([{}]);
+
+    const result = await findContainerForType(WEB_ID, POD_ROOT, TYPE_URI, vi.fn());
+    expect(result).toBeNull();
+  });
+
+  it('returns null when type index is inaccessible', async () => {
+    vi.mocked(solidClient.getSolidDataset)
+      .mockResolvedValueOnce({}) // profile
+      .mockRejectedValueOnce(new Error('404')); // type index
+    vi.mocked(solidClient.getThing).mockReturnValue({});
+    vi.mocked(solidClient.getUrl).mockReturnValue('https://example.com/alice/settings/publicTypeIndex.ttl');
+
+    const result = await findContainerForType(WEB_ID, POD_ROOT, TYPE_URI, vi.fn());
+    expect(result).toBeNull();
+  });
+});
+
+// ─── registerTypeIndex ───────────────────────────────────────────────────────
+
+describe('registerTypeIndex', () => {
+  const WEB_ID        = 'https://example.com/alice/profile/card#me';
+  const POD_ROOT      = 'https://example.com/alice/';
+  const TYPE_URI      = 'https://schema.org/NoteDigitalDocument';
+  const CONTAINER_URL = 'https://example.com/alice/notes/';
+  const TYPE_INDEX_URL = 'https://example.com/alice/settings/publicTypeIndex.ttl';
+
+  const fakeThing = {};
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('saves the registration to the type index', async () => {
+    vi.mocked(solidClient.getSolidDataset)
+      .mockResolvedValueOnce({}) // profile (resolveTypeIndexUrl)
+      .mockResolvedValueOnce({}); // existing type index
+    vi.mocked(solidClient.getThing).mockReturnValue({});
+    vi.mocked(solidClient.getUrl).mockReturnValue(TYPE_INDEX_URL);
+    vi.mocked(solidClient.buildThing).mockReturnValue({ addUrl: vi.fn().mockReturnThis(), build: vi.fn().mockReturnValue(fakeThing) });
+    vi.mocked(solidClient.createThing).mockReturnValue({});
+    vi.mocked(solidClient.setThing).mockReturnValue({});
+    vi.mocked(solidClient.saveSolidDatasetAt).mockResolvedValue({});
+
+    await registerTypeIndex(WEB_ID, POD_ROOT, TYPE_URI, CONTAINER_URL, vi.fn());
+    expect(vi.mocked(solidClient.saveSolidDatasetAt)).toHaveBeenCalledWith(
+      TYPE_INDEX_URL,
+      expect.anything(),
+      expect.objectContaining({ fetch: expect.any(Function) }),
+    );
+  });
+
+  it('creates a fresh dataset when type index does not exist yet', async () => {
+    vi.mocked(solidClient.getSolidDataset)
+      .mockResolvedValueOnce({}) // profile
+      .mockRejectedValueOnce(new Error('404')); // type index absent
+    vi.mocked(solidClient.getThing).mockReturnValue({});
+    vi.mocked(solidClient.getUrl).mockReturnValue(TYPE_INDEX_URL);
+    vi.mocked(solidClient.createSolidDataset).mockReturnValue({});
+    vi.mocked(solidClient.buildThing).mockReturnValue({ addUrl: vi.fn().mockReturnThis(), build: vi.fn().mockReturnValue(fakeThing) });
+    vi.mocked(solidClient.createThing).mockReturnValue({});
+    vi.mocked(solidClient.setThing).mockReturnValue({});
+    vi.mocked(solidClient.saveSolidDatasetAt).mockResolvedValue({});
+
+    await registerTypeIndex(WEB_ID, POD_ROOT, TYPE_URI, CONTAINER_URL, vi.fn());
+    expect(vi.mocked(solidClient.createSolidDataset)).toHaveBeenCalled();
+    expect(vi.mocked(solidClient.saveSolidDatasetAt)).toHaveBeenCalled();
+  });
+
+  it('does not throw when saveSolidDatasetAt fails (non-fatal)', async () => {
+    vi.mocked(solidClient.getSolidDataset)
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({});
+    vi.mocked(solidClient.getThing).mockReturnValue({});
+    vi.mocked(solidClient.getUrl).mockReturnValue(TYPE_INDEX_URL);
+    vi.mocked(solidClient.buildThing).mockReturnValue({ addUrl: vi.fn().mockReturnThis(), build: vi.fn().mockReturnValue(fakeThing) });
+    vi.mocked(solidClient.createThing).mockReturnValue({});
+    vi.mocked(solidClient.setThing).mockReturnValue({});
+    vi.mocked(solidClient.saveSolidDatasetAt).mockRejectedValue(new Error('403 Forbidden'));
+
+    await expect(registerTypeIndex(WEB_ID, POD_ROOT, TYPE_URI, CONTAINER_URL, vi.fn()))
+      .resolves.toBeUndefined();
   });
 });
