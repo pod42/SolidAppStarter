@@ -83,6 +83,8 @@ const TYPE_REGISTRATION        = 'http://www.w3.org/ns/solid/terms#TypeRegistrat
 
 // Rule 0 — Read solid:publicTypeIndex from the WebID profile; conventional
 // fallback only if the profile does not advertise the URL explicitly.
+// NOTE: CSS in subdomain mode serves the type index at `settings/publicTypeIndex`
+// (no extension). Never hard-code `.ttl` — use the extensionless path.
 export async function resolveTypeIndexUrl(webId, podRoot, fetchFn) {
   try {
     const ds      = await getSolidDataset(webId, { fetch: fetchFn });
@@ -90,7 +92,7 @@ export async function resolveTypeIndexUrl(webId, podRoot, fetchFn) {
     const fromProfile = profile ? getUrl(profile, SOLID_PUBLIC_TYPE_INDEX) : null;
     if (fromProfile) return fromProfile;
   } catch { /* fall through */ }
-  return `${podRoot}settings/publicTypeIndex.ttl`;
+  return `${podRoot}settings/publicTypeIndex`;
 }
 
 // Rule 1 — Look up a container (or singleton) for a given RDF type in the
@@ -160,7 +162,37 @@ export async function fetchProfile(webId, fetchFn) {
     getUrl(profile, VCARD.hasPhoto) ||
     null;
 
-  return { name, storageRoot, avatar };
+  // Extended profile fields — present on most pods; null if not set
+  const bio      = getStringNoLocale(profile, 'http://schema.org/description') ||
+                   getStringNoLocale(profile, 'http://xmlns.com/foaf/0.1/note') || null;
+  const jobTitle = getStringNoLocale(profile, 'http://schema.org/jobTitle') ||
+                   getStringNoLocale(profile, 'http://www.w3.org/2006/vcard/ns#title') || null;
+  const org      = getStringNoLocale(profile, 'http://www.w3.org/2006/vcard/ns#organization-name') ||
+                   getStringNoLocale(profile, 'http://schema.org/worksFor') || null;
+  const location = getStringNoLocale(profile, 'http://schema.org/homeLocation') ||
+                   getStringNoLocale(profile, 'http://www.w3.org/2006/vcard/ns#hasAddress') || null;
+  const homepage = getUrl(profile, FOAF.homepage) ||
+                   getUrl(profile, 'http://schema.org/url') || null;
+
+  // Social links — derived from owl:sameAs / rdfs:seeAlso URLs
+  const sameAsUrls = [
+    ...( profile ? (getThing(dataset, webId) ? [] : []) : [] ),
+  ];
+  try {
+    const { getUrlAll } = await import('@inrupt/solid-client');
+    const all = [
+      ...getUrlAll(profile, 'http://www.w3.org/2002/07/owl#sameAs'),
+      ...getUrlAll(profile, 'http://www.w3.org/2000/01/rdf-schema#seeAlso'),
+    ];
+    sameAsUrls.push(...all);
+  } catch { /* vocab import unavailable */ }
+  const twitter  = sameAsUrls.find(u => /twitter\.com|x\.com/i.test(u)) || null;
+  const linkedin = sameAsUrls.find(u => /linkedin\.com/i.test(u)) || null;
+  const github   = sameAsUrls.find(u => /github\.com/i.test(u)) || null;
+  const mastodon = sameAsUrls.find(u => /mastodon\.|fosstodon\.|hachyderm\.|social\.coop|infosec\.exchange/i.test(u)) || null;
+  const bluesky  = sameAsUrls.find(u => /bsky\.app|bsky\.social/i.test(u)) || null;
+
+  return { name, storageRoot, avatar, bio, jobTitle, org, location, homepage, twitter, linkedin, github, mastodon, bluesky };
 }
 
 // ─── Container listing ───────────────────────────────────────────────────────

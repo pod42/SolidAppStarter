@@ -71,19 +71,24 @@ deploy/
 
 ```
 webId available
-  → fetchProfile()            → gets name, storageRoot, avatar
+  → fetchProfile()            → gets name, storageRoot, avatar (+ bio, jobTitle, org, social links)
   → define app root           → storageRoot + 'your-app-folder/'
   → HEAD app root             → createFolder() if 404
+  → findContainerForType()    → check if typed container already registered
+  → createFolder() if needed  → create the container
+  → registerTypeIndex()       → register forClass → container in publicTypeIndex
   → ensureOwnInboxAppendable()  ← MUST be awaited before reading inbox
   → load application data
 ```
+
+> **Type index step is required** for your app's data to appear as a chip on the user's pod home page at `{username}.privatedatapod.com`.
 
 ---
 
 ## 6. solid.js — Key Functions
 
 ### Profile
-- `fetchProfile(webId, fetch)` → `{ name, storageRoot, avatar }`
+- `fetchProfile(webId, fetch)` → `{ name, storageRoot, avatar, bio, jobTitle, org, location, homepage, twitter, linkedin, github, mastodon, bluesky }`
 
 ### Containers
 - `listContainer(url, fetch)` → `[{ url, name, isFolder, modified, size }]`
@@ -110,13 +115,21 @@ webId available
 
 **Pattern for every new typed container:**
 ```js
+// TYPE_URI must match the full URI of the @type used in your JSON-LD records.
+// e.g. if your records have '@type': 'Place' with '@vocab': 'https://schema.org/',
+// then TYPE_URI = 'https://schema.org/Place'  ← these two values must agree.
+const TYPE_URI = 'https://schema.org/Place'; // ← set to match your @type
+
 const existing = await findContainerForType(webId, storageRoot, TYPE_URI, session.fetch);
-const containerUrl = existing ?? `${storageRoot}my-folder/`;
+const containerUrl = existing ?? `${storageRoot}my-app/`;
 if (!existing) {
   await createFolder(containerUrl, session.fetch);
   await registerTypeIndex(webId, storageRoot, TYPE_URI, containerUrl, session.fetch);
 }
+// Use containerUrl as appRoot going forward
 ```
+
+> **Pod home chip**: once registered, a chip (e.g. "📍 Places") appears on the user's pod home page at `{username}.privatedatapod.com` — visible to anyone who visits the pod.
 
 ---
 
@@ -225,9 +238,11 @@ Everything else — auth, pod utilities, UI primitives — is pre-built and stab
 **The standard init pattern** (already in AppShell.jsx):
 ```
 webId available
-  → ops.fetchProfile()              → gets name, storageRoot, avatar
-  → define appRoot                  → storageRoot + 'your-app-slug/'
+  → ops.fetchProfile()              → gets name, storageRoot, avatar (+ extended fields)
+  → define appRoot                  → from type index OR storageRoot + 'your-app-slug/'
+  → findContainerForType()          → check if container already registered in type index
   → HEAD appRoot → createFolder()   → creates folder if missing
+  → registerTypeIndex()             → registers app data type so pod home shows a chip
   → ensureOwnInboxAppendable()      → sets up inbox (required!)
   → load your data
 ```
@@ -238,11 +253,13 @@ Solid is built on Linked Data. Store records as `application/ld+json` with a `@c
 so data is interpretable by other Solid apps. JSON-LD is valid JSON — `.json()` works.
 
 ```js
-// Write
+// The '@type' value here and the TYPE_URI in registerTypeIndex() must match.
+// e.g. '@type': 'Place' with '@vocab': 'https://schema.org/' resolves to
+// https://schema.org/Place — use the same URI in registerTypeIndex().
 const record = {
   '@context': { '@vocab': 'https://schema.org/', 'dcterms': 'http://purl.org/dc/terms/' },
   '@id': appRoot + item.id,        // resource URL as the RDF subject
-  '@type': 'Thing',                // e.g. 'Note', 'Event', 'Place', 'Product'
+  '@type': 'CreativeWork',         // replace with your data type — see class URI table in PROMPT.md
   'name': item.name,
   'description': item.description,
   'dcterms:created': item.created,

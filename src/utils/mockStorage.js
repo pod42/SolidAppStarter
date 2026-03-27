@@ -15,7 +15,27 @@ export function fetchProfile(_webId, _fetch) {
     name: 'Mock User',
     storageRoot: 'mock://pod/',
     avatar: null,
+    bio: null, jobTitle: null, org: null, location: null,
+    homepage: null, twitter: null, linkedin: null, github: null,
+    mastodon: null, bluesky: null,
   });
+}
+
+// ─── Type Index (no-ops in mock mode) ────────────────────────────────────────
+// These functions are no-ops in mock mode — type index registration does not
+// apply to localStorage-backed storage. Apps calling these in mock mode will
+// simply get null / do nothing, which is the correct behaviour.
+
+export function resolveTypeIndexUrl(_webId, podRoot, _fetch) {
+  return Promise.resolve(`${podRoot}settings/publicTypeIndex`);
+}
+
+export function findContainerForType(_webId, _podRoot, _typeUri, _fetch) {
+  return Promise.resolve(null);
+}
+
+export function registerTypeIndex(_webId, _podRoot, _typeUri, _containerUrl, _fetch) {
+  return Promise.resolve();
 }
 
 // ─── Container ───────────────────────────────────────────────────────────────

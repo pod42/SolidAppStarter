@@ -90,14 +90,20 @@ Pre-built CSS classes:
 ```js
 const p = await ops.fetchProfile(webId, session.fetch);
 setProfile(p);
-const root = p.storageRoot + 'YOUR-APP-SLUG/';
-setAppRoot(root);
-try {
-  const r = await session.fetch(root, { method: 'HEAD' });
-  if (r.status === 404) await ops.createFolder(root, session.fetch);
-} catch {
-  await ops.createFolder(root, session.fetch);
+// Check type index first — the user may already have a container from a previous session
+const TYPE_URI = 'https://schema.org/REPLACE_WITH_YOUR_TYPE'; // ← see class URI table below
+let root = await ops.findContainerForType(webId, p.storageRoot, TYPE_URI, session.fetch);
+if (!root) {
+  root = p.storageRoot + 'YOUR-APP-SLUG/';
+  try {
+    const r = await session.fetch(root, { method: 'HEAD' });
+    if (r.status === 404) await ops.createFolder(root, session.fetch);
+  } catch {
+    await ops.createFolder(root, session.fetch);
+  }
+  await ops.registerTypeIndex(webId, p.storageRoot, TYPE_URI, root, session.fetch);
 }
+setAppRoot(root);
 await ops.ensureOwnInboxAppendable(webId, session.fetch);
 // now load your data
 ```
@@ -110,13 +116,15 @@ by other Solid apps. JSON-LD is valid JSON — session.fetch(...).json() works u
 
 Write a record:
 ```js
+// IMPORTANT: the '@type' value here must match TYPE_URI in the init pattern above.
+// With '@vocab': 'https://schema.org/', '@type': 'Place' resolves to https://schema.org/Place.
 const record = {
   '@context': {
     '@vocab': 'https://schema.org/',
     'dcterms': 'http://purl.org/dc/terms/',
   },
   '@id': appRoot + item.id,        // the resource URL becomes the RDF subject
-  '@type': 'Thing',                // use a specific type — see vocabulary note below
+  '@type': 'CreativeWork',         // ← replace with your type (see class URI table below)
   'name': item.name,
   'description': item.description,
   'dcterms:created': item.created,
@@ -152,6 +160,31 @@ Common schema.org @type values to use:
 - 'Product'               — inventory items
 - 'Person'                — contacts / address book
 - 'CreativeWork'          — generic structured records
+
+**Class URI table** — pick the type that fits your data. The pod home page at `{username}.privatedatapod.com`
+shows a chip (icon + label) for each registered type. `@type` shorthand works when `@vocab` is `https://schema.org/`.
+
+| `@type` shorthand | Full URI (`TYPE_URI`) | Pod home chip |
+|---|---|---|
+| `Place` | `https://schema.org/Place` | 📍 Places |
+| `Event` | `https://schema.org/Event` | 📅 Events |
+| `Recipe` | `https://schema.org/Recipe` | 🍳 Recipes |
+| `ItemList` | `https://schema.org/ItemList` | 📋 Lists |
+| `Article` | `https://schema.org/Article` | 📄 Articles |
+| `Book` | `https://schema.org/Book` | 📚 Books |
+| `Movie` | `https://schema.org/Movie` | 🎬 Movies |
+| `TVSeries` | `https://schema.org/TVSeries` | 📺 Shows |
+| `VideoGame` | `https://schema.org/VideoGame` | 🎮 Games |
+| `MusicPlaylist` | `https://schema.org/MusicPlaylist` | 🎵 Music |
+| `MusicRecording` | `https://schema.org/MusicRecording` | 🎵 Tracks |
+| `Photograph` | `https://schema.org/Photograph` | 📷 Photos |
+| `Collection` | `https://schema.org/Collection` | 🗂 Collections |
+| `Note` (ActivityStreams) | `https://www.w3.org/ns/activitystreams#Note` | 📝 Notes |
+| `LongChat` (Solid) | `https://www.w3.org/ns/solid/terms#LongChat` | 💬 Chat |
+| `AddressBook` (vCard) | `http://www.w3.org/2006/vcard/ns#AddressBook` | 📒 Contacts |
+| `Task` (noeldemartin) | `https://vocab.noeldemartin.com/tasks/Task` | ✅ Tasks |
+
+For types not in this table the chip will show the URI fragment as a label with a 📦 icon.
 
 Common vocabulary fields:
 - schema: name, description, dateCreated, dateModified, identifier, url, image
